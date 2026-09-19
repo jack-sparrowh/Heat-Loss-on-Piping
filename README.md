@@ -9,17 +9,3 @@ The code was prepared to run inside excels implementation of python IDE, that is
 Most importantly this is a project that allowed me to understand steady-state heat transfer.
 
 I'm adding also draft of my introduction text that will be attached in excel file. Additionally, there will be a whole blog post written with all derivations and I will drop it here once it is done. I'm writting all of it in my own free time, so it takes me a lot of time.
-
-My only hope is that all the equations are rigorous under this list of assumptions:
-1. Steady-state operation (both mass and energy).
-2. The change in kinetic and potential energy is negligible.
-3. The flow is turbulent and pipes are full of liquid.
-4. The fluid is incompressible.
-5. The specific heat capacity is constant.
-6. Fluid is loosing energy to surroundings.
-7. No axial heat transfer.
-8. Uniform heat transfer distribution in piping cross section.
-9. Piping is horizontal and enclosed by air only.
-10. Air around piping is at ambient pressure.
-11. Internal fluir heat transfer coeff. and material conductivities are constant.
-12. Fluid is gaining energy by solar radiation (solar mode only).
