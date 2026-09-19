@@ -1,177 +1,6 @@
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize_scalar
-from scipy.integrate import quad
-
-class Air:
-
-    '''
-    Describes air properties around piping. 
-    Provides all necessary functions for heat transfer coefficient determination.
-    
-    Parameters
-    ----------
-    outer_diameter: float, array-like
-    	Piping outer diameter [inch]
-    insulation_thickness: float, array-like
-    	Insulation thickness [inch]
-    ambient_temperature: float, array-like
-    	Ambient temperature [K]
-    emissivity: float
-    	Piping surface emissivity []
-    
-    Returns
-    -------
-    Air_class: 
-    	Air class.
-    '''
-    
-    def __init__(
-        self,
-        outer_diameter,
-        insulation_thickness,
-        ambient_temperature,
-        emissivity
-    ):
-
-        self.total_diameter = outer_diameter + 2 * insulation_thickness
-        self.ambient_temperature = ambient_temperature
-        self.emissivity = emissivity
-        
-    
-    def cp(
-        self,
-        ref_temperature
-    ):
-
-        '''
-        Calculate specific heat capacity of air at reference temperature, which is film temperature of air around piping.
-        Model is taken from Cengel, and is fitted to a range 273K - 1800K. Below 273K cp is equal to cp at 273K and above 
-        1800K cp is equal to cp at 1800K.
-    
-        Parameters
-        ----------
-        ref_temperature: float, array_like
-            Reference temperature at insulation-air interface [K]
-    
-        Returns
-        -------
-        _cp: float, array_like
-            Specific heat capacity [kJ/kg.K]
-        '''        
-        
-        # all constants here come from "Thermodynamics: An Engineering Approach" by Y. Cengel
-        _cp_f = lambda ref_temperature: (28.11 + 0.1967e-2 * ref_temperature + 0.4802e-5 * ref_temperature ** 2 - 1.966e-9 * ref_temperature ** 3) / 28.96
-        
-        # going with np.array below assures that even when ref_temp is int all calculations carry on
-        _cp = np.array(_cp_f(ref_temperature))
-        _cp[ref_temperature < 273] = _cp_f(273)
-        _cp[ref_temperature > 1800] = _cp_f(1800)
-        return _cp
-
-    def u(
-        self,
-        ref_temperature
-    ):
-    
-        '''
-        Calculate kinematic viscosity of air at reference temperature, which is film temperature of air around piping.
-    
-        Parameters
-        ----------
-        ref_temperature: float, array_like
-            Reference temperature at insulation-air interface [K]
-    
-        Returns
-        -------
-        _u: float, array_like
-            Kinematic viscosity [Pa*s]
-        '''
-    
-        # Sutherland's Law
-        _u = 1.458e-6 * ref_temperature ** 1.5 / (ref_temperature + 110.4)
-        return _u
-    
-    def Ra(
-        self,
-        ambient_temperature,
-        surface_temperature,
-    ):
-    
-        '''
-        Calculate Rayleigh number of air at film temperature for horizontal cylindrical body. 
-        It is assummed that Pr=0.72 for air in all temperature range.
-    
-        Parameters
-        ----------
-        surface_temperature: float, array_like
-            Insulation surface temperature [K]
-        ambient_temperature: float
-            Ambient temperature around piping [K]
-    
-        Returns
-        -------
-        _Ra: float, array_like
-            Rayleigh number.
-        '''
-
-        film_temperature = (surface_temperature + ambient_temperature) / 2
-    
-        # Pr = 0.72 -> mean value for air on range from 220K to 2200K
-        # g = 9.81 -> gravitational acceleration
-        # P / R = 101.325 / 0.287 -> atmospheric pressure over gas constant for air
-        # 0.0254 -> conversion from inch to meter
-        _Ra = 0.72 * 9.81 * (101.325 / 0.287) ** 2 *\
-            np.abs(surface_temperature - ambient_temperature) / (film_temperature ** 3 * self.u(film_temperature) ** 2) *\
-            (self.total_diameter * 0.0254) ** 3
-        
-        return _Ra
-    
-    def h_combined(
-        self,
-        surface_temperature
-    ):
-    
-        '''
-        Calculate combined heat transfer coefficient at insulation-air interface.
-        Radiation heat transfer coeff. is in its typical form.
-        Convective heat transfer is based on Churchill and Chu correlation formula.
-    
-        Parameters
-        ----------
-        surface_temperature: float, array_like
-            Insulation surface temperature [F]
-    
-        Returns
-        -------
-        _h_comb_vec: array_like
-            Array with heat transfer coefficients of radiative and convective effects.
-        '''
-    
-        surface_temperature_R = surface_temperature + 459.67
-        ambient_temperature_R = self.ambient_temperature + 459.67
-    
-        # 1.71E-9 -> Stefan-Boltzmann constant
-        h_rad = self.emissivity * 1.71E-9 *\
-                (surface_temperature_R ** 2 + ambient_temperature_R ** 2) *\
-                (surface_temperature_R + ambient_temperature_R)
-    
-        surface_temperature_K = surface_temperature_R * 5/9
-        ambient_temperature_K = ambient_temperature_R * 5/9
-        film_temperature_K = (surface_temperature_K + ambient_temperature_K) / 2
-    
-        # 0.1762280394 -> conversion from W/m.K to BTU/ft.h.F
-        # 1000 -> conversion from kW to W
-        # Pr = 0.72 -> mean value for air on range from 220K to 2200K
-        # 0.6 + 0.387 / 1.20326 -> constants from Churchill and Chu correlation assuming Pr=0.72
-        # 0.0254 -> conversion from inch to meters
-        h_conv = 0.1762280394 * 1000 / 0.72 *\
-                 (0.6 + 0.387 / 1.20326 * self.Ra(surface_temperature_K, ambient_temperature_K) ** (1/6)) ** 2 *\
-                 self.u(film_temperature_K) * self.cp(film_temperature_K) / (self.total_diameter * 0.0254)
-    
-        _h_comb_vec = np.c_[h_rad, h_conv]
-    
-        return _h_comb_vec
 
 class Piping_Segment:
 
@@ -194,8 +23,6 @@ class Piping_Segment:
         Temperature at start length. If there is more than one segment, then inlet_temperature_i = final_temperature_(i-1) [F]
     ambient_temperature: float
         Ambient temperature [F]
-    h_fluid_to_pipe: float
-        Heat transfer coeff from fluid to wall of piping [BTU/ft2.h.F]
     k_pipe: float
         Thermal conductivity of piping material [BTU/ft.h.F]
     k_insulation: float
@@ -222,11 +49,10 @@ class Piping_Segment:
         start_length,
         inlet_temperature,
         ambient_temperature,
-        h_fluid_to_pipe, 
-        k_pipe, 
-        k_insulation,
         mass_flow_rate,
         specific_heat_capacity,
+        k_pipe, 
+        k_insulation,
         solar_flux,
         h_combined_func
     ):
@@ -241,7 +67,6 @@ class Piping_Segment:
         self.end_length = self.start_length + self.segment_length
         
         # piping thermal properties
-        self.h_fluid_to_pipe = h_fluid_to_pipe
         self.k_pipe = k_pipe
         self.k_insulation = k_insulation
 
@@ -293,8 +118,7 @@ class Piping_Segment:
             Combined thermal conductivity [BTU/ft.h.F]
         '''
 
-        _R = (12 * 2) / (self.h_fluid_to_pipe * self.inner_diameter) +\
-             np.log( self.outer_diameter / self.inner_diameter ) / self.k_pipe +\
+        _R = np.log( self.outer_diameter / self.inner_diameter ) / self.k_pipe +\
              np.log( self.total_diameter / self.outer_diameter ) / self.k_insulation +\
              (12 * 2) / (self.h_comb_func(T_surface) * self.total_diameter)
     
@@ -390,6 +214,9 @@ class Piping_Segment:
         self,
         threshold=0.01
     ):
+        
+        # initiate by finding inlet surface temperature
+        self.find_inlet_surface_temperature()
         
         # calculate constant temperature solar flux
         self.const_temp_sol_flux = self.h_comb_func(self.inlet_surface_temperature) \
@@ -500,37 +327,6 @@ class Piping_Segment:
         
         return self.surface_temperature
         
-    def calculate_heat_per_length(
-        self, 
-        k, 
-        LMTD
-    ):
-
-        '''
-        Calculates heat transfer rate per unit length of piping.
-        The form of equation might suggests that only conductivity can be passed as an argument,
-        but one can utilize thermal resistance network approach to connect conductivity to any
-        other reqiured value. As an example, user can pass:
-        (Ts-Ta) / (Tf-Ta) * D_t/2 * h
-        to find how heat transfer changes with changing heat transfer coeff. on surface of piping.
-        
-        Parameters
-        ----------
-        k: float, array-like
-        	Pseudo-conductivity. Must have a unit of conductivity [BTU/ft.h.F]
-        LMTD: float, array-like
-        	Log-mean temperature difference [F]
-        
-        Returns
-        -------
-        _hpl: float, array-like
-        	Heat transfer per length.
-        '''
-
-        _hpl = 2 * np.pi * k * LMTD
-        
-        return _hpl
-        
     def temperature_profile(self, n=2):
 
         '''
@@ -553,24 +349,21 @@ class Piping_Segment:
         # initialize at x=0
         temp_profile = [self.inlet_temperature]
         surf_temp_profile = [self.inlet_surface_temperature]
-        h_comb_profile = [self.h_comb_vec(self.inlet_surface_temperature).flatten()]
         segment_length = [0]
 
         # run through rest n-1 segments
         for _l in np.linspace(self.segment_length / (n - 1), self.segment_length, n - 1):
  
             _T_surf_l = self.find_surface_temperature(_l)
-            _h_comb_vec_l = self.h_comb_vec(_T_surf_l).flatten() 
             _T_l = self.find_fluid_temperature(_T_surf_l)
 
             temp_profile.append(_T_l[0])
             surf_temp_profile.append(_T_surf_l)
-            h_comb_profile.append(_h_comb_vec_l)
             segment_length.append(_l)
 
         _result_df = pd.DataFrame(
-            np.c_[segment_length, temp_profile, surf_temp_profile, h_comb_profile],
-            columns=["length", "temp", "surf_temp", "h_rad", "h_conv"]
+            np.c_[segment_length, temp_profile, surf_temp_profile],
+            columns=["length", "temp", "surf_temp"]
         )
 
         self.temp_prof = _result_df

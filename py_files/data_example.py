@@ -34,29 +34,27 @@ def properties_table_example():
 
     # PROPERTIES TABLE EXAMPLE
     properties_table_imperial = pd.Series(
-        [1800, 68, 60, 9.7, 0.025, 24155, 1, 50, 1], 
+        [1800, 68, 24155, 1, 9.7, 0.025, 50, 1], 
         index=[
             'inlet_temperature', 
             'ambient_temperature', 
-            'h_fluid_to_pipe', 
+            'mass_flow_rate', 
+            'specific_heat_capacity',
             'k_pipe', 
             'k_insulation', 
-            'mass_flow_rate', 
-            'specific_heat_capacity', 
             'solar_flux', 
             'emissivity'
         ])
 
     properties_table_si = pd.Series(
-        [982, 20, 340, 16.8, 0.043, 10942, 4.2, 157.7, 1], 
+        [982, 20, 10942, 4.2, 16.8, 0.043, 157.7, 1], 
         index=[
             'inlet_temperature', 
             'ambient_temperature', 
-            'h_fluid_to_pipe', 
+            'mass_flow_rate', 
+            'specific_heat_capacity',
             'k_pipe', 
             'k_insulation', 
-            'mass_flow_rate', 
-            'specific_heat_capacity', 
             'solar_flux', 
             'emissivity'
         ])

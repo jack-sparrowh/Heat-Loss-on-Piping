@@ -54,11 +54,10 @@ def prop_table_prepare(properties_table):
     prep_properties_table.index = [
         'inlet_temperature',
 		'ambient_temperature',
-        'h_fluid_to_pipe',
-        'k_pipe',
-        'k_insulation',
         'mass_flow_rate',
         'specific_heat_capacity',
+        'k_pipe',
+        'k_insulation',
         'solar_flux',
         'emissivity'
     ]
@@ -87,11 +86,10 @@ def prop_table_units_handler(properties_table, units):
     if units.lower() == 'si':
         _uh_prop_table['inlet_temperature'] = 1.8 * _uh_prop_table['inlet_temperature'] + 32
         _uh_prop_table['ambient_temperature'] = 1.8 * _uh_prop_table['ambient_temperature'] + 32
-        _uh_prop_table['h_fluid_to_pipe'] = _uh_prop_table['h_fluid_to_pipe'] * 1 / 5.67826 # 1 BTU/ft2.h.F = 5.67826 W/m2.K
-        _uh_prop_table['k_pipe'] = _uh_prop_table['k_pipe'] * 1 / 1.73073 # 1 BTU/ft.h.F = 1.73073 W/m.K
-        _uh_prop_table['k_insulation'] = _uh_prop_table['k_insulation'] * 1 / 1.73073 # 1 BTU/ft.h.F = 1.73073 W/m.K
         _uh_prop_table['mass_flow_rate'] = _uh_prop_table['mass_flow_rate'] * 1 / 0.453592 # 1 lb/h = 0.453592 kg/h
         _uh_prop_table['specific_heat_capacity'] = _uh_prop_table['specific_heat_capacity'] * 1 / 4.1868 # 1 BTU/lb.F = 4.1868 kJ/kg.K
+        _uh_prop_table['k_pipe'] = _uh_prop_table['k_pipe'] * 1 / 1.73073 # 1 BTU/ft.h.F = 1.73073 W/m.K
+        _uh_prop_table['k_insulation'] = _uh_prop_table['k_insulation'] * 1 / 1.73073 # 1 BTU/ft.h.F = 1.73073 W/m.K
         _uh_prop_table['solar_flux'] = _uh_prop_table['solar_flux'] * 1 / 3.154105 # 1 BTU/ft2.h = 3.154105 W/m2
     
     return _uh_prop_table
@@ -115,11 +113,10 @@ def user_units(units):
     units_list = [
         'F',
         'F',
-        'BTU/ft2.h.F',
-        'BTU/ft.h.F',
-        'BTU/ft.h.F',
         'lbm/h',
         'BTU/lbm.F',
+        'BTU/ft.h.F',
+        'BTU/ft.h.F',
         'BTU/ft2.h',
         ''
     ]
@@ -128,11 +125,10 @@ def user_units(units):
         units_list = [
             'C',
             'C',
-            'W/m2.K',
-            'W/m.K',
-            'W/m.K',
             'kg/h',
             'kJ/kg.K',
+            'W/m.K',
+            'W/m.K',
             'W/m2',
             ''
         ]
