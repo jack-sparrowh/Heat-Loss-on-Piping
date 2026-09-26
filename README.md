@@ -1,5 +1,7 @@
 # Heat Loss on Piping
 
+NOTE: currently correcting heat flux errors in code
+
 This README is a simple yapping introduction. I will update it to look professional, once I'm done with excel implementation and all derivations text.
 
 Code calculating heat loss (or gain) of liquid flowing at constant mass flow rate through insulated (or not) piping.
