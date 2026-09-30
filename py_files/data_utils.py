@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from scipy.optimize import minimize_scalar
 
 def find_heat_rates(piping_segment, n):
 
@@ -9,15 +10,15 @@ def find_heat_rates(piping_segment, n):
     From energy balance A_t*q_s - Q_avg = m_rate*C*dT_f we find Q_avg as
     Q_avg = A_t*q_s - m_rate*C*dT_f = Q_s + Q_lost_fluid
     Then we find average surface temperature that yields
-    (Q_avg - pi*D_t*h_vec*dT_sa)**2 = 0
-    
+    (Q_avg - pi*D_t*(h_vec*dT_sa - q/2*1_vec))**2 = 0
+
     Parameters
     ----------
     piping_segment: class object
     	Filled Piping_Segment class []
     n: int
     	Number of parts to split the given segment to []
-    
+
     Returns
     -------
     total_heat_rate_out: float
@@ -25,19 +26,21 @@ def find_heat_rates(piping_segment, n):
     total_heat_from_h_vec(w_minim): float
     	Average net heat lost.
     '''
-    
+
     ps = piping_segment
-    
+
     # calculate heat lost by fluid
     total_heat_rate_out = -ps.mass_flow_rate * ps.specific_heat_capacity * (ps.temp_prof["temp"][n-1] - ps.inlet_temperature) / ps.segment_length
-    # calculate heat absorbed by solar radiation
-    total_heat_rate_solar = np.pi * ps.total_diameter / 12 * ps.solar_flux
+    # calculate heat absorbed by heat flux
+    total_heat_rate_flux = np.pi * ps.total_diameter / 12 * ps.heat_flux_abs
     # find average net heat lost
-    total_heat_rate_lost_avg = total_heat_rate_solar + total_heat_rate_out
-    
-    #find surface temperature that provides the average net heat lost
+    total_heat_rate_lost_avg = total_heat_rate_flux + total_heat_rate_out
+
+    # find surface temperature that provides the average net heat lost
     surf_w_temp = lambda w: np.array(w * ps.temp_prof["surf_temp"][n-1] + (1 - w) * ps.temp_prof["surf_temp"][0])
-    total_heat_from_h_vec = lambda w: np.pi * ps.total_diameter / 12 * ps.h_comb_vec(surf_w_temp(w)) * (surf_w_temp(w) - ps.ambient_temperature)
+    total_heat_from_h_vec = lambda w: np.pi * ps.total_diameter / 12 * \
+                                      (ps.h_comb_vec(surf_w_temp(w)) * (surf_w_temp(w) - ps.ambient_temperature) - \
+                                       ps.heat_flux_abs * np.array([[ps.emissivity, 1 - ps.emissivity]]))
     _loss = lambda w: (total_heat_rate_lost_avg - total_heat_from_h_vec(w).sum()) ** 2
     w_minim = minimize_scalar(_loss, bounds=[0, 1]).x
     return total_heat_rate_out, total_heat_from_h_vec(w_minim)
@@ -99,9 +102,9 @@ def calculate_total_piping(piping_class, air_surface_class, user_table, properti
         
         # load piping class
         if i == 0:
-            ps = piping_class(*user_table.loc[0, :], 0, *properties_table[:-1], a.h_combined)
+            ps = piping_class(*user_table.loc[0, :], 0, *properties_table, a.h_combined)
         else:
-            ps = piping_class(*user_table.loc[i, :], ps.end_length, ps.temp_prof.loc[n-1, 'temp'], *properties_table[1:-1], a.h_combined)
+            ps = piping_class(*user_table.loc[i, :], ps.end_length, ps.temp_prof.loc[n-1, 'temp'], *properties_table[1:], a.h_combined)
 
         # find temperature profile
         ps.temperature_profile(n=n)

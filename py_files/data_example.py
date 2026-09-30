@@ -47,7 +47,7 @@ def properties_table_example():
         ])
 
     properties_table_si = pd.Series(
-        [982, 20, 10942, 4.2, 16.8, 0.043, 157.7, 1], 
+        [982, 20, 10956.5, 4.186, 16.8, 0.0433, 157.7, 1], 
         index=[
             'inlet_temperature', 
             'ambient_temperature', 

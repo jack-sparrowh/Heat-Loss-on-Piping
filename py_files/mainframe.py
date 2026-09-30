@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize_scalar
+from scipy.integrate import quad
 
 class Air:
 
@@ -193,16 +194,22 @@ class Piping_Segment:
         Temperature at start length. If there is more than one segment, then inlet_temperature_i = final_temperature_(i-1) [F]
     ambient_temperature: float
         Ambient temperature [F]
-    k_pipe: float
-        Thermal conductivity of piping material [BTU/ft.h.F]
-    k_insulation: float
-        Thermal conductivity of insulation material [BTU/ft.h.F]
     mass_flow_rate: float
         Mass flow rate [lbm/h]
     specific_heat_capacity: float
         Specific heat capacity of liquid [BTU/lbm.R]
+    k_pipe: float
+        Thermal conductivity of piping material [BTU/ft.h.F]
+    k_insulation: float
+        Thermal conductivity of insulation material [BTU/ft.h.F]
+    heat_flux: float
+        Value of heat flux [BTU/ft2.h]
+    emissivity: float
+    	Piping surface emissivity []
     h_combined_func: function
         Function for calculating combined heat transfer coeff. Must take one argument only []
+    absorptivity: float
+        Absorptivity of piping surface. By default, equal to 1 []
     
     Returns
     -------
@@ -223,8 +230,10 @@ class Piping_Segment:
         specific_heat_capacity,
         k_pipe, 
         k_insulation,
-        solar_flux,
-        h_combined_func
+        heat_flux,
+        emissivity,
+        h_combined_func,
+        absorptivity=1
     ):
 
         # piping geometry
@@ -256,18 +265,12 @@ class Piping_Segment:
 
         # define derivative function
         self.derivative = lambda f, x: ( f(x+0.00001) - f(x-0.00001) ) / 0.00002
-
-        # find inlet surface temperature
-        self.find_inlet_surface_temperature()
         
-        # set normal bounds for find_surface_temperature
-        # we use sorted() for when inlet temperature is lower than ambient temperature
-        self.bounds=sorted([self.ambient_temperature, self.inlet_surface_temperature])
-
-        # solar flux
-        self.solar_flux = solar_flux
-        if solar_flux > 0:
-            self.solar_radiation_helper()
+        # heat flux
+        # we always want to use flux helper as it sets proper bounds for all cases
+        self.emissivity = emissivity
+        self.heat_flux_abs = heat_flux * absorptivity
+        self.heat_flux_abs_helper()
 
     def K(
         self,
@@ -295,7 +298,6 @@ class Piping_Segment:
         self.K_combined = 1 / _R
 
         return self.K_combined
-
 
     def ratio_of_resistances(
         self,
@@ -341,7 +343,7 @@ class Piping_Segment:
             Temperature calculated at provided surface temperature [F]
         '''
 
-        _T_fluid = self.ambient_temperature + (T_surface - self.ambient_temperature) *\
+        _T_fluid = self.ambient_temperature + (T_surface - self.ambient_temperature - self.heat_flux_abs / self.h_comb_func(T_surface)) *\
                     self.ratio_of_resistances(T_surface)
     
         self.fluid_temperature = _T_fluid
@@ -355,7 +357,7 @@ class Piping_Segment:
         Calculate inlet surface temperature.
 
         Function minimizez squared difference of:
-        R_fa/R_sa*(Ts-Ta)-(Tf-Ta)
+        R_fa/R_sa*[(Ts-Ta) - q/h(Ts)]-(Tf-Ta)
 
         Parameters
         ----------
@@ -367,20 +369,24 @@ class Piping_Segment:
         '''
 
         _T_surf_loss_func = lambda T_surface: (
-            (T_surface - self.ambient_temperature) * self.ratio_of_resistances(T_surface) -\
-            (self.inlet_temperature - self.ambient_temperature)
+            (T_surface - self.ambient_temperature - self.heat_flux_abs / self.h_comb_func(T_surface)) *\
+            self.ratio_of_resistances(T_surface) - (self.inlet_temperature - self.ambient_temperature)
         ) ** 2
 
         # we use sorted() for when inlet temperature is lower than ambient temperature
+        # it is important to use bracket here as starting interval
+        # it is important to use bounds with 0R as lower bound,
+        # this is because for very large heat_flux values minimize_scalar might try values of negative R
         self.minim_inlet_surface_temperature = minimize_scalar(
             _T_surf_loss_func,
-            bounds=sorted([self.ambient_temperature, self.inlet_temperature])
+            bracket=sorted([self.ambient_temperature, self.inlet_temperature]),
+            bounds=[-459, 1E9]
         )
 
         # make sure to extract float, so scipy can accept it
         self.inlet_surface_temperature = self.minim_inlet_surface_temperature.x[0]
 
-    def solar_radiation_helper(
+    def heat_flux_abs_helper(
         self,
         threshold=0.01
     ):
@@ -388,22 +394,22 @@ class Piping_Segment:
         # initiate by finding inlet surface temperature
         self.find_inlet_surface_temperature()
         
-        # calculate constant temperature solar flux
-        self.const_temp_sol_flux = self.h_comb_func(self.inlet_surface_temperature) \
+        # calculate constant temperature heat flux
+        self.const_temp_heat_flux_abs = 0.5 * self.h_comb_func(self.inlet_surface_temperature) \
                                     * (self.inlet_surface_temperature - self.ambient_temperature)
 
-        # find how close provided solar flux is to constant temp solar flux
-        _closeness = self.solar_flux / self.const_temp_sol_flux - 1
+        # find how close provided heat flux is to constant temp heat flux
+        _closeness = self.heat_flux_abs / self.const_temp_heat_flux_abs - 1
 
-        _loss = lambda T_s: ( self.h_comb_func(T_s) * (T_s - self.ambient_temperature) - self.solar_flux ) ** 2
+        _loss = lambda T_s: ( 0.5 * self.h_comb_func(T_s) * (T_s - self.ambient_temperature) - self.heat_flux_abs ) ** 2
 
         if _closeness >= 0:
             
             upper_bound = minimize_scalar(_loss).x[0]
-            self.bounds = sorted([self.ambient_temperature, upper_bound])
+            self.bounds = sorted([self.inlet_surface_temperature, upper_bound])
 
             if _closeness <= threshold:
-                self.solar_flux = (1 + threshold) * self.const_temp_sol_flux
+                self.heat_flux_abs = (1 + threshold) * self.const_temp_heat_flux_abs
 
         else:
 
@@ -411,7 +417,7 @@ class Piping_Segment:
             self.bounds = sorted([lower_bound, self.inlet_surface_temperature])
 
             if _closeness >= -threshold:
-                self.solar_flux = (1 - threshold) * self.const_temp_sol_flux
+                self.heat_flux_abs = (1 - threshold) * self.const_temp_heat_flux_abs
 
     def integrand(
         self,
@@ -432,10 +438,15 @@ class Piping_Segment:
         '''
 
         ln_res_ratio = lambda T_surface: np.log(self.ratio_of_resistances(T_surface))
+        inv_h = lambda T_surface: 1 / self.h_comb_func(T_surface)
 
-        _I = 1 / self.K(T_surface) * ( 1 / (T_surface - self.ambient_temperature) + self.derivative(ln_res_ratio, T_surface) )
+        _inv_part_I = self.K(T_surface) * ( 1 - 2 * self.heat_flux_abs / (self.h_comb_func(T_surface) * ( T_surface - self.ambient_temperature )) )
 
-        _integrand = _I / ( 1 - self.solar_flux / (self.h_comb_func(T_surface) * (T_surface - self.ambient_temperature)) )
+        _paren_part_1_I = 1 / (T_surface - self.ambient_temperature ) * ( 1 - self.heat_flux_abs * self.derivative(inv_h, T_surface) )
+        
+        _paren_part_2_I = ( 1 - self.heat_flux_abs / (self.h_comb_func(T_surface) * ( T_surface - self.ambient_temperature )) ) * self.derivative(ln_res_ratio, T_surface)
+
+        _integrand = 1 / _inv_part_I * (_paren_part_1_I + _paren_part_2_I)
 
         # make sure to extract float, so scipy can accept it
         return _integrand[0]
