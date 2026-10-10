@@ -10,7 +10,7 @@ def find_heat_rates(piping_segment, n):
     From energy balance A_t*q_s - Q_avg = m_rate*C*dT_f we find Q_avg as
     Q_avg = A_t*q_s - m_rate*C*dT_f = Q_s + Q_lost_fluid
     Then we find average surface temperature that yields
-    (Q_avg - pi*D_t*(h_vec*dT_sa - q/2*1_vec))**2 = 0
+    (Q_avg - pi*D_t*(||h_vec||_1*dT_sa - q))**2 = 0
 
     Parameters
     ----------
@@ -34,40 +34,15 @@ def find_heat_rates(piping_segment, n):
     # calculate heat absorbed by heat flux
     total_heat_rate_flux = np.pi * ps.total_diameter / 12 * ps.heat_flux_abs
     # find average net heat lost
-    total_heat_rate_lost_avg = total_heat_rate_flux + total_heat_rate_out
+    total_heat_rate_lost_avg = 2 * total_heat_rate_flux + total_heat_rate_out
 
     # find surface temperature that provides the average net heat lost
     surf_w_temp = lambda w: np.array(w * ps.temp_prof["surf_temp"][n-1] + (1 - w) * ps.temp_prof["surf_temp"][0])
     total_heat_from_h_vec = lambda w: np.pi * ps.total_diameter / 12 * \
-                                      (ps.h_comb_vec(surf_w_temp(w)) * (surf_w_temp(w) - ps.ambient_temperature) - \
-                                       ps.heat_flux_abs * np.array([[ps.emissivity, 1 - ps.emissivity]]))
+                                      ps.h_comb_vec(surf_w_temp(w)) * (surf_w_temp(w) - ps.ambient_temperature)
     _loss = lambda w: (total_heat_rate_lost_avg - total_heat_from_h_vec(w).sum()) ** 2
     w_minim = minimize_scalar(_loss, bounds=[0, 1]).x
     return total_heat_rate_out, total_heat_from_h_vec(w_minim)
-
-def LMTD(T_i, T_e, T_a):
-
-    '''
-    Find Log-mean temperature difference.
-
-    Parameters
-    ----------
-    T_i: float, array-like
-    	Inlet temperature [F]
-    T_e: float, array-like
-    	Exit temperature [F]
-    T_a: float, array-like
-    	Ambient temperature [F]
-    
-    Returns
-    -------
-    _lmtd: float, array-like
-    	Log-mean temperature difference.
-    '''
-    
-    # use np.abs for cases when fluid temperature is less than ambient temperature
-    _lmtd = ( T_i - T_e ) / ( np.log(np.abs(T_i - T_a)) - np.log(np.abs(T_e - T_a)) )
-    return _lmtd
 
 def calculate_total_piping(piping_class, air_surface_class, user_table, properties_table, n=2):
 

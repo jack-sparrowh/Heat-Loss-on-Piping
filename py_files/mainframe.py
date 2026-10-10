@@ -388,7 +388,7 @@ class Piping_Segment:
 
     def heat_flux_abs_helper(
         self,
-        threshold=0.01
+        threshold=0.001
     ):
         
         # initiate by finding inlet surface temperature
