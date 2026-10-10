@@ -1,7 +1,5 @@
 # Heat Loss on Piping
 
-NOTE: currently correcting heat flux errors in code
-
 This README is a simple yapping introduction. I will update it to look professional, once I'm done with excel implementation and all derivations text.
 
 Code calculating heat loss (or gain) of liquid flowing at constant mass flow rate through insulated (or not) piping.
@@ -11,3 +9,5 @@ The code was prepared to run inside excels implementation of python IDE, that is
 Most importantly this is a project that allowed me to understand steady-state heat transfer.
 
 I'm adding also draft of my introduction text that will be attached in excel file. Additionally, there will be a whole blog post written with all derivations and I will drop it here once it is done. I'm writting all of it in my own free time, so it takes me a lot of time.
+
+Recently I have derived equations for heat tracing, so I might add it to code.
