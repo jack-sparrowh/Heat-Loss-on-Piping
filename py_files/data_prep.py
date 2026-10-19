@@ -58,7 +58,6 @@ def prop_table_prepare(properties_table):
         'specific_heat_capacity',
         'k_pipe',
         'k_insulation',
-        'solar_flux',
         'emissivity'
     ]
     return prep_properties_table
@@ -90,7 +89,6 @@ def prop_table_units_handler(properties_table, units):
         _uh_prop_table['specific_heat_capacity'] = _uh_prop_table['specific_heat_capacity'] * 1 / 4.1868 # 1 BTU/lb.F = 4.1868 kJ/kg.K
         _uh_prop_table['k_pipe'] = _uh_prop_table['k_pipe'] * 1 / 1.73073 # 1 BTU/ft.h.F = 1.73073 W/m.K
         _uh_prop_table['k_insulation'] = _uh_prop_table['k_insulation'] * 1 / 1.73073 # 1 BTU/ft.h.F = 1.73073 W/m.K
-        _uh_prop_table['solar_flux'] = _uh_prop_table['solar_flux'] * 1 / 3.154105 # 1 BTU/ft2.h = 3.154105 W/m2
     
     return _uh_prop_table
 
@@ -116,8 +114,7 @@ def user_units(units):
         'lbm/h',
         'BTU/lbm.F',
         'BTU/ft.h.F',
-        'BTU/ft.h.F',
-        'BTU/ft2.h',
+        'BTU/ft.h.F'
         ''
     ]
     
@@ -128,8 +125,7 @@ def user_units(units):
             'kg/h',
             'kJ/kg.K',
             'W/m.K',
-            'W/m.K',
-            'W/m2',
+            'W/m.K'
             ''
         ]
     
