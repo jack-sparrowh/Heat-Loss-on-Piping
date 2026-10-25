@@ -7,10 +7,8 @@ def find_heat_rates(piping_segment, n):
     '''
     Finds total heat lost by fluid as well as average net heat lost.
     Here, total heat lost by fluid is Q_lost_fluid = -m_rate*C*dT_f
-    From energy balance A_t*q_s - Q_avg = m_rate*C*dT_f we find Q_avg as
-    Q_avg = - m_rate*C*dT_f = Q_lost_fluid
-    Then we find average surface temperature that yields
-    (Q_avg - pi*D_t*||h_vec||_1*dT_sa)**2 = 0
+    It finds average surface temperature that yields
+    (P_y*q" - m*C*dT_f/L - P_t*||h_vec||_1*dT_sa)**2 = 0
 
     Parameters
     ----------
@@ -22,9 +20,9 @@ def find_heat_rates(piping_segment, n):
     Returns
     -------
     total_heat_rate_out: float
-    	Total heat lost by the fluid.
-    total_heat_from_h_vec(w_minim): float
-    	Average net heat lost.
+    	Total heat lost by the fluid [W/m]
+    total_heat_from_h_vec(w_minim): array-like
+    	Average net heat lost by radiation and convection [W/m]
     '''
 
     ps = piping_segment
@@ -32,15 +30,21 @@ def find_heat_rates(piping_segment, n):
     # calculate heat lost by fluid
     total_heat_rate_out = -ps.mass_flow_rate * ps.specific_heat_capacity * (ps.temp_prof["temp"][n-1] - ps.inlet_temperature) / ps.segment_length
 
+    # calculate heat gain by flux/tracing
+    total_heat_rate_gain = np.pi * ps.D_y * ps.heat_flux_abs
+
+    # calculate net heat
+    total_heat_net = total_heat_rate_gain + total_heat_rate_out
+
     # find surface temperature that provides the average net heat lost
     surf_w_temp = lambda w: np.array(w * ps.temp_prof["surf_temp"][n-1] + (1 - w) * ps.temp_prof["surf_temp"][0])
-    total_heat_from_h_vec = lambda w: np.pi * ps.total_diameter / 12 * \
+    total_heat_from_h_vec = lambda w: np.pi * ps.total_diameter * \
                                       ps.h_comb_vec(surf_w_temp(w)) * (surf_w_temp(w) - ps.ambient_temperature)
-    _loss = lambda w: (total_heat_rate_out - total_heat_from_h_vec(w).sum()) ** 2
+    _loss = lambda w: (total_heat_net - total_heat_from_h_vec(w).sum()) ** 2
     w_minim = minimize_scalar(_loss, bounds=[0, 1]).x
     return total_heat_rate_out, total_heat_from_h_vec(w_minim)
 
-def calculate_total_piping(piping_class, air_surface_class, user_table, properties_table, n=2):
+def calculate_total_piping(piping_class, air_surface_class, user_table, properties_table, mode, n=2):
 
     '''
     Calculate all pipng segments provided by user.
@@ -73,9 +77,9 @@ def calculate_total_piping(piping_class, air_surface_class, user_table, properti
         
         # load piping class
         if i == 0:
-            ps = piping_class(*user_table.loc[0, :], 0, *properties_table[:-1], a.h_combined)
+            ps = piping_class(*user_table.loc[0, :], 0, *properties_table[:-1], a.h_combined, mode)
         else:
-            ps = piping_class(*user_table.loc[i, :], ps.end_length, ps.temp_prof.loc[n-1, 'temp'], *properties_table[1:-1], a.h_combined)
+            ps = piping_class(*user_table.loc[i, :], ps.end_length, ps.temp_prof.loc[n-1, 'temp'], *properties_table[1:-1], a.h_combined, mode)
 
         # find temperature profile
         ps.temperature_profile(n=n)
@@ -163,18 +167,18 @@ def final_table_units_handler(piping_segment_class_list, units):
         f'Heat Transfer by Convection [{heat}]'
     ]
 
-    length, temp, heat = ['ft', 'F', 'BTU/h.ft']
+    length, temp, heat = ['m', 'C', 'W/m']
 
-    if units.lower() == 'si':
-        length, temp, heat = ['m', 'C', 'W/m']
-        _uh_final_table['segment_length'] = _uh_final_table['segment_length'] * 0.3048 # 1 ft = 0.3048 m
-        _uh_final_table['temperature_inlet'] = (_uh_final_table['temperature_inlet'] - 32) / 1.8
-        _uh_final_table['temperature_outlet'] = (_uh_final_table['temperature_outlet'] - 32) / 1.8
-        _uh_final_table['surface_temperature_inlet'] = (_uh_final_table['surface_temperature_inlet'] - 32) / 1.8
-        _uh_final_table['surface_temperature_outlet'] = (_uh_final_table['surface_temperature_outlet'] - 32) / 1.8
-        _uh_final_table['heat_sum'] = _uh_final_table['heat_sum'] * 0.293071 / 0.3048 # 1 BTU/h.ft = 0.293071 / 0.3048 W/m
-        _uh_final_table['heat_by_radiation'] = _uh_final_table['heat_by_radiation'] * 0.293071 / 0.3048 # 1 BTU/h.ft = 0.293071 / 0.3048 W/m
-        _uh_final_table['heat_by_convection'] = _uh_final_table['heat_by_convection'] * 0.293071 / 0.3048 # 1 BTU/h.ft = 0.293071 / 0.3048 W/m
+    if units.lower() == 'imperial':
+        length, temp, heat = ['ft', 'F', 'BTU/h.ft']
+        _uh_final_table['segment_length'] *= 1 / 0.3048 # 1 ft = 0.3048 m
+        _uh_final_table['temperature_inlet'] = 1.8 * _uh_final_table['temperature_inlet'] + 32
+        _uh_final_table['temperature_outlet'] = 1.8 * _uh_final_table['temperature_outlet'] + 32
+        _uh_final_table['surface_temperature_inlet'] = 1.8 * _uh_final_table['surface_temperature_inlet'] + 32
+        _uh_final_table['surface_temperature_outlet'] = 1.8 * _uh_final_table['surface_temperature_outlet'] + 32
+        _uh_final_table['heat_sum'] *= 0.3048 / 0.293071 # 1 BTU/h.ft = 0.293071 / 0.3048 W/m
+        _uh_final_table['heat_by_radiation'] *= 0.3048 / 0.293071 # 1 BTU/h.ft = 0.293071 / 0.3048 W/m
+        _uh_final_table['heat_by_convection'] *= 0.3048 / 0.293071 # 1 BTU/h.ft = 0.293071 / 0.3048 W/m
 
     _uh_final_table.columns = rename_columns(length, temp, heat)
 

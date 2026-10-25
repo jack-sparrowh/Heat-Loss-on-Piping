@@ -28,8 +28,17 @@ def user_table_prepare(user_table, units):
     ]
     prep_user_table = user_table[user_table.notnull().all(1)].copy()
 
-    if units.lower() == 'si':
-        prep_user_table.loc[:, 'segment_length'] = prep_user_table.loc[:, 'segment_length'] * 1 / 0.3048 # 1 ft = 0.3048 m
+    if units.lower() == 'imperial':
+        prep_user_table.loc[:, 'segment_length'] *= 0.3048 # 1 ft = 0.3048 m
+
+    # diameter and insulation thickness is always in inches, convert them to meters
+    prep_user_table.loc[:, 
+        [
+            'pipe_outer_diameter',
+            'pipe_inner_diameter',
+            'insulation_thickness'
+        ]
+    ] *= 0.0254 # 1 inch = 0.0254 m
     
     return prep_user_table
     
@@ -82,13 +91,13 @@ def prop_table_units_handler(properties_table, units):
     
     _uh_prop_table = prop_table_prepare(properties_table)
     
-    if units.lower() == 'si':
-        _uh_prop_table['inlet_temperature'] = 1.8 * _uh_prop_table['inlet_temperature'] + 32
-        _uh_prop_table['ambient_temperature'] = 1.8 * _uh_prop_table['ambient_temperature'] + 32
-        _uh_prop_table['mass_flow_rate'] = _uh_prop_table['mass_flow_rate'] * 1 / 0.453592 # 1 lb/h = 0.453592 kg/h
-        _uh_prop_table['specific_heat_capacity'] = _uh_prop_table['specific_heat_capacity'] * 1 / 4.1868 # 1 BTU/lb.F = 4.1868 kJ/kg.K
-        _uh_prop_table['k_pipe'] = _uh_prop_table['k_pipe'] * 1 / 1.73073 # 1 BTU/ft.h.F = 1.73073 W/m.K
-        _uh_prop_table['k_insulation'] = _uh_prop_table['k_insulation'] * 1 / 1.73073 # 1 BTU/ft.h.F = 1.73073 W/m.K
+    if units.lower() == 'imperial':
+        _uh_prop_table['inlet_temperature'] = (_uh_prop_table['inlet_temperature'] - 32) / 1.8
+        _uh_prop_table['ambient_temperature'] = (_uh_prop_table['ambient_temperature'] - 32) / 1.8
+        _uh_prop_table['mass_flow_rate'] *= 0.453592 # 1 lb/h = 0.453592 kg/h
+        _uh_prop_table['specific_heat_capacity'] *= 4.1868 # 1 BTU/lb.F = 4.1868 kJ/kg.K
+        _uh_prop_table['k_pipe'] *= 1.73073 # 1 BTU/ft.h.F = 1.73073 W/m.K
+        _uh_prop_table['k_insulation'] *= 1.73073 # 1 BTU/ft.h.F = 1.73073 W/m.K
     
     return _uh_prop_table
 
@@ -107,19 +116,8 @@ def user_units(units):
     units_list: list
         List of units.
     '''
-    
+
     units_list = [
-        'F',
-        'F',
-        'lbm/h',
-        'BTU/lbm.F',
-        'BTU/ft.h.F',
-        'BTU/ft.h.F'
-        ''
-    ]
-    
-    if units.lower() == 'si':
-        units_list = [
             'C',
             'C',
             'kg/h',
@@ -128,6 +126,17 @@ def user_units(units):
             'W/m.K'
             ''
         ]
+    
+    if units.lower() == 'imperial':
+        units_list = [
+        'F',
+        'F',
+        'lbm/h',
+        'BTU/lbm.F',
+        'BTU/ft.h.F',
+        'BTU/ft.h.F'
+        ''
+    ]
     
     return units_list
     
@@ -146,8 +155,8 @@ def segment_length_print(units):
     string: str
         String of length units.
     '''
-    length = 'ft'
-    if units.lower() == 'si':
-        length = 'm'
+    length = 'm'
+    if units.lower() == 'imperial':
+        length = 'ft'
     
     return f'Segment length [{length}]'

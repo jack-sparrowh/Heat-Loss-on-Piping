@@ -129,7 +129,7 @@ class Air:
     
     def h_combined(
         self,
-        surface_temperature
+        T_surface
     ):
     
         '''
@@ -140,32 +140,30 @@ class Air:
         Parameters
         ----------
         surface_temperature: float, array_like
-            Insulation surface temperature [F]
+            Insulation surface temperature [C]
     
         Returns
         -------
         _h_comb_vec: array_like
-            Array with heat transfer coefficients of radiative and convective effects.
+            Array with heat transfer coefficients of radiative and convective effects [W/m2.K]
         '''
+
+        # change to K
+        surface_temperature_K = T_surface + 273.15
+        ambient_temperature_K = self.ambient_temperature + 273.15
     
-        surface_temperature_R = surface_temperature + 459.67
-        ambient_temperature_R = self.ambient_temperature + 459.67
-    
-        # 1.71E-9 -> Stefan-Boltzmann constant
-        h_rad = self.emissivity * 1.71E-9 *\
-                (surface_temperature_R ** 2 + ambient_temperature_R ** 2) *\
-                (surface_temperature_R + ambient_temperature_R)
-    
-        surface_temperature_K = surface_temperature_R * 5/9
-        ambient_temperature_K = ambient_temperature_R * 5/9
+        # 5.67E-8 -> Stefan-Boltzmann constant in W/m2.K4
+        h_rad = self.emissivity * 5.67E-8 *\
+                (surface_temperature_K ** 2 + ambient_temperature_K ** 2) *\
+                (surface_temperature_K + ambient_temperature_K)
+        
         film_temperature_K = (surface_temperature_K + ambient_temperature_K) / 2
     
-        # 0.1762280394 -> conversion from W/m.K to BTU/ft.h.F
         # 1000 -> conversion from kW to W
         # Pr = 0.72 -> mean value for air on range from 220K to 2200K
         # 0.6 + 0.387 / 1.20326 -> constants from Churchill and Chu correlation assuming Pr=0.72
         # 0.0254 -> conversion from inch to meters
-        h_conv = 0.1762280394 * 1000 / 0.72 *\
+        h_conv = 1000 / 0.72 *\
                  (0.6 + 0.387 / 1.20326 * self.Ra(surface_temperature_K, ambient_temperature_K) ** (1/6)) ** 2 *\
                  self.u(film_temperature_K) * self.cp(film_temperature_K) / (self.total_diameter * 0.0254)
     
@@ -181,29 +179,35 @@ class Piping_Segment:
     Parameters
     ----------
     outer_diameter: float
-        Outer diameter [inch]
+        Outer diameter [m]
     inner_diameter: float
-        Inner diameter [inch]
+        Inner diameter [m]
     insulation_thickness: float
-        Insulation thickness [inch]
+        Insulation thickness [m]
     segment_length: float
-        Length of pipng segment [ft]
+        Length of pipng segment [m]
     start_length: float
-        Initial cumulative length. If there is more than one segment, then start_length_i = end_segment_(i-1) [F]
+        Initial cumulative length. If there is more than one segment, then start_length_i = end_segment_(i-1) [m]
     inlet_temperature: float
-        Temperature at start length. If there is more than one segment, then inlet_temperature_i = final_temperature_(i-1) [F]
+        Temperature at start length. If there is more than one segment, then inlet_temperature_i = final_temperature_(i-1) [C]
     ambient_temperature: float
-        Ambient temperature [F]
+        Ambient temperature [C]
     mass_flow_rate: float
-        Mass flow rate [lbm/h]
+        Mass flow rate [kg/h]
     specific_heat_capacity: float
-        Specific heat capacity of liquid [BTU/lbm.R]
+        Specific heat capacity of liquid [kJ/kg.K]
     k_pipe: float
-        Thermal conductivity of piping material [BTU/ft.h.F]
+        Thermal conductivity of piping material [W/m.K]
     k_insulation: float
-        Thermal conductivity of insulation material [BTU/ft.h.F]
+        Thermal conductivity of insulation material [W/m.K]
+    heat_flux: float
+        Value of heat flux [W/m2]
     h_combined_func: function
         Function for calculating combined heat transfer coeff. Must take one argument only []
+    mode: str
+        Mode of calculation, either standard, heat flux or heat tracing []
+    absorptivity: float
+        Absorptivity of piping surface. By default, equal to 0.25 []
     
     Returns
     -------
@@ -224,17 +228,27 @@ class Piping_Segment:
         specific_heat_capacity,
         k_pipe, 
         k_insulation,
-        h_combined_func
+        heat_flux,
+        h_combined_func,
+        mode,
+        absorptivity=1
     ):
 
         # piping geometry
-        self.outer_diameter = outer_diameter
-        self.inner_diameter = inner_diameter
-        self.insulation_thickness = insulation_thickness
+        # 0.0254 multiplication added for testing
+        # in full code it shouldnt be there
+        self.outer_diameter = outer_diameter * 0.0254
+        self.inner_diameter = inner_diameter * 0.0254
+        self.insulation_thickness = insulation_thickness * 0.0254
         self.segment_length = segment_length
         self.start_length = start_length
         self.total_diameter = self.outer_diameter + 2 * self.insulation_thickness
         self.end_length = self.start_length + self.segment_length
+
+        # define variable diameter
+        self.D_y = self.total_diameter
+        if mode.lower() == "heat tracing":
+            self.D_y = self.outer_diameter
         
         # piping thermal properties
         self.k_pipe = k_pipe
@@ -257,60 +271,49 @@ class Piping_Segment:
         # define derivative function
         self.derivative = lambda f, x: ( f(x+0.00001) - f(x-0.00001) ) / 0.00002
 
-        # find surface temperature
-        self.find_inlet_surface_temperature()
+        # heat flux
+        # we always want to use flux helper as it sets proper bounds for all cases
+        self.heat_flux_abs = heat_flux * absorptivity
+        if mode.lower() == 'standard':
+            self.heat_flux_abs = 0
+        self.heat_flux_abs_helper()
 
-    def K(
-        self,
-        T_surface
-    ):
-    
+    def U_x(self, kind):
+
         '''
-        Calculate combined thermal conductivity.
-    
+        Calculates heat transfer coeff. for different layers.
+        fx - from fluid to x in insulation
+        xs - from x in insulation to surface
+
         Parameters
         ----------
-        T_surface: float, array_like
-            Insulation surface temperature [F]
     
         Returns
         -------
-        _K: float, array_like
-            Combined thermal conductivity [BTU/ft.h.F]
+        _U_fs: float, array_like
+            heat transfer coeff. [W/m2.K]
         '''
-
-        _R = np.log( self.outer_diameter / self.inner_diameter ) / self.k_pipe +\
-             np.log( self.total_diameter / self.outer_diameter ) / self.k_insulation +\
-             (12 * 2) / (self.h_comb_func(T_surface) * self.total_diameter)
-    
-        self.K_combined = 1 / _R
-
-        return self.K_combined
-
-    def ratio_of_resistances(
-        self,
-        T_surface
-    ):
-
-        '''
-        Calculate ratio of thermal resistances. The returned ratio finds R_fa/R_sa where
-        R_fa = 1/(2*pi*K)
-        R_sa = 24/(2*pi*D*h).
-
-        Parameters
-        ----------
-        T_surface: float
-        	Insulation surface temperature [F]
         
-        Returns
-        -------
-        _res_ratio: float
-        	Calculated resistance ratio.
-        '''
+        pseudo_R_fx = np.log( self.outer_diameter / self.inner_diameter ) / self.k_pipe +\
+            np.log( self.D_y / self.outer_diameter ) / self.k_insulation
+        
+        pseudo_R_xs = np.log( self.total_diameter / self.D_y ) / self.k_insulation
 
-        _res_ratio = self.total_diameter * self.h_comb_func(T_surface) / (24 * self.K(T_surface))
+        _U_fx = 2 / (self.total_diameter * pseudo_R_fx)
+        
+        if self.D_y == self.total_diameter:
+            _U_xs = np.inf
+        else:
+            _U_xs = 2 / (self.total_diameter * pseudo_R_xs)
 
-        return _res_ratio
+        if kind == "fx":
+            _U_x = _U_fx
+
+        elif kind == "rx":
+            _u_rx = 1 + _U_fx / _U_xs
+            _U_x = _u_rx
+
+        return _U_x
     
     def find_fluid_temperature(
         self, 
@@ -323,16 +326,17 @@ class Piping_Segment:
         Parameters
         ----------
         T_surface: float, array_like
-            Insulation surface temperature [F]
+            Insulation surface temperature [C]
     
         Returns
         -------
         _T_fluid: float, array_like
-            Temperature calculated at provided surface temperature [F]
+            Temperature calculated at provided surface temperature [C]
         '''
 
-        _T_fluid = self.ambient_temperature + (T_surface - self.ambient_temperature) *\
-                    self.ratio_of_resistances(T_surface)
+        _T_fluid = T_surface + ( self.U_x('rx') * self.h_comb_func(T_surface) *\
+            (T_surface - self.ambient_temperature) - self.D_y / self.total_diameter * self.heat_flux_abs ) /\
+            self.U_x('fx')
     
         self.fluid_temperature = _T_fluid
 
@@ -344,8 +348,8 @@ class Piping_Segment:
         '''
         Calculate inlet surface temperature.
 
-        Function minimizez squared difference of:
-        R_fa/R_sa*[(Ts-Ta) - q/h(Ts)]-(Tf-Ta)
+        Function minimizes squared difference of:
+        U_fx*(T_f-T_s) + D_y/D_t*q - u_rx*h(T_s)*(T_s-T_a)
 
         Parameters
         ----------
@@ -357,19 +361,78 @@ class Piping_Segment:
         '''
 
         _T_surf_loss_func = lambda T_surface: (
-            (T_surface - self.ambient_temperature) *\
-            self.ratio_of_resistances(T_surface) - (self.inlet_temperature - self.ambient_temperature)
+            self.U_x('fx') * (self.inlet_temperature - T_surface) +\
+            self.D_y / self.total_diameter * self.heat_flux_abs -\
+            self.U_x('rx') * self.h_comb_func(T_surface) * (T_surface - self.ambient_temperature)
         ) ** 2
 
         # we use sorted() for when inlet temperature is lower than ambient temperature
+        # it is important to use bracket here as starting interval
+        # it is important to use bounds with 0R as lower bound,
+        # this is because for very large heat_flux values minimize_scalar might try values of negative K
         self.minim_inlet_surface_temperature = minimize_scalar(
             _T_surf_loss_func,
-            bounds=sorted([self.ambient_temperature, self.inlet_temperature])
+            bracket=sorted([self.ambient_temperature, self.inlet_temperature]),
+            bounds=[-273.15, 1E9]
         )
 
         # make sure to extract float, so scipy can accept it
         self.inlet_surface_temperature = self.minim_inlet_surface_temperature.x[0]
 
+    def heat_flux_abs_helper(
+        self,
+        threshold=0.001
+    ):
+
+        '''
+        Function setting bounds for all cases and updating heat flux if
+        it is close within threshold value of critical point of integrand.
+
+        Parameters
+        ----------
+        threshold: float
+            Determines how close heat flux must be to trigger update. Default 1 []
+        
+        Returns
+        -------
+        '''
+        
+        # initiate by finding inlet surface temperature
+        self.find_inlet_surface_temperature()
+        
+        # calculate constant temperature heat flux
+        self.const_temp_heat_flux_abs = self.total_diameter / self.D_y *\
+            self.h_comb_func(self.inlet_surface_temperature) * (self.inlet_surface_temperature - self.ambient_temperature)
+
+        # find how close provided heat flux is to constant temp heat flux
+        _closeness = self.heat_flux_abs / self.const_temp_heat_flux_abs - 1
+
+        _loss = lambda T_s: (
+            self.h_comb_func(T_s) *\
+            (T_s - self.ambient_temperature) -\
+            self.D_y / self.total_diameter * self.heat_flux_abs
+        ) ** 2
+
+        if _closeness >= 0:
+
+            # update bounds for heating
+            upper_bound = minimize_scalar(_loss).x[0]
+            self.bounds = sorted([self.inlet_surface_temperature, upper_bound])
+
+            if _closeness <= threshold:
+                # update heat flux value to escape critical point of integrand
+                self.heat_flux_abs = (1 + threshold) * self.const_temp_heat_flux_abs
+
+        else:
+
+            # update bounds for cooling
+            lower_bound = minimize_scalar(_loss).x[0]
+            self.bounds = sorted([lower_bound, self.inlet_surface_temperature])
+
+            if _closeness >= -threshold:
+                # update heat flux value to escape critical point of integrand
+                self.heat_flux_abs = (1 - threshold) * self.const_temp_heat_flux_abs
+    
     def integrand(
         self,
         T_surface
@@ -380,7 +443,7 @@ class Piping_Segment:
         Parameters
         ----------
         T_surface: float
-        	Insulation surface temperature [F]
+        	Insulation surface temperature [C]
         
         Returns
         -------
@@ -388,9 +451,12 @@ class Piping_Segment:
         	Calculated integrand.
         '''
 
-        ln_res_ratio = lambda T_surface: np.log(self.ratio_of_resistances(T_surface))
-
-        _integrand = 1 / self.K(T_surface) * (1 / (T_surface - self.ambient_temperature ) + self.derivative(ln_res_ratio, T_surface))
+        _integrand_p1 = self.h_comb_func(T_surface) * (T_surface - self.ambient_temperature) -\
+            self.D_y / self.total_diameter * self.heat_flux_abs
+        _integrand_p2 = 1 + self.U_x('rx') * self.h_comb_func(T_surface) / self.U_x('fx') +\
+            self.U_x('rx') * (T_surface - self.ambient_temperature) / self.U_x('fx') *\
+            self.derivative(self.h_comb_func, T_surface)
+        _integrand = 1 / _integrand_p1 * _integrand_p2
 
         # make sure to extract float, so scipy can accept it
         return _integrand[0]
@@ -407,9 +473,9 @@ class Piping_Segment:
         Parameters
         ----------
         T_surface: float
-        	Insulation surface temperature [F]
+        	Insulation surface temperature [C]
         length: float
-        	Distance at which to find surface temperature [ft]
+        	Distance at which to find surface temperature [m]
         
         Returns
         -------
@@ -417,7 +483,7 @@ class Piping_Segment:
         	Calculated loss.
         '''
         
-        _lambda = self.mass_flow_rate * self.specific_heat_capacity / (2 * np.pi)
+        _lambda = self.mass_flow_rate * self.specific_heat_capacity / (np.pi * self.total_diameter)
         integral = quad(self.integrand, self.inlet_surface_temperature, T_surface, limit=500)
         loss = (integral[0] + length / _lambda) ** 2
 
@@ -434,7 +500,7 @@ class Piping_Segment:
         Parameters
         ----------
         length: float
-        	Distance at which to find surface temperature [ft]
+        	Distance at which to find surface temperature [m]
         
         Returns
         -------
@@ -444,7 +510,7 @@ class Piping_Segment:
 
         self.minim_surface_temperature = minimize_scalar(
             self.integral_loss_function,
-            bounds=sorted([self.ambient_temperature, self.inlet_temperature]),
+            bounds=self.bounds,
             args=(length)
         )
 

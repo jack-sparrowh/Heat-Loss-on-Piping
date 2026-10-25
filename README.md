@@ -10,4 +10,4 @@ Most importantly this is a project that allowed me to understand steady-state he
 
 I'm adding also draft of my introduction text that will be attached in excel file. Additionally, there will be a whole blog post written with all derivations and I will drop it here once it is done. I'm writting all of it in my own free time, so it takes me a lot of time.
 
-I have scrapped heat flux part, as I came to conslusion that I'm out of my depth. When testing with 3rd party software I got different results, came back to derive the equations and was getting different results when using different thermal resistance term. I decided to leave it only with standard heat loss model and just go back to books for the time being.
+FINALLY, I was able to derive general heat transfer equations for external heat flux as well as heat tracing.
