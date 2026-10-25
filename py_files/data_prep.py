@@ -57,7 +57,8 @@ def prop_table_prepare(properties_table):
     prep_properties_table: pd.DataFrame
         Prepared properties table. 
     '''
-    
+
+    # to be updated with heat flux etc
     prep_properties_table = properties_table.copy().iloc[:, 0]
     prep_properties_table.name = 'Values'
     prep_properties_table.index = [
@@ -90,7 +91,8 @@ def prop_table_units_handler(properties_table, units):
     '''
     
     _uh_prop_table = prop_table_prepare(properties_table)
-    
+
+    # to be updated with heat flux etc
     if units.lower() == 'imperial':
         _uh_prop_table['inlet_temperature'] = (_uh_prop_table['inlet_temperature'] - 32) / 1.8
         _uh_prop_table['ambient_temperature'] = (_uh_prop_table['ambient_temperature'] - 32) / 1.8
@@ -117,6 +119,7 @@ def user_units(units):
         List of units.
     '''
 
+    # to be updated with heat flux etc
     units_list = [
             'C',
             'C',
