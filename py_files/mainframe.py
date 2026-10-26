@@ -33,8 +33,10 @@ class Air:
         ambient_temperature,
         emissivity
     ):
-
-        self.total_diameter = outer_diameter + 2 * insulation_thickness
+        
+        # 0.0254 multiplication added for testing
+        # in full code it shouldnt be there
+        self.total_diameter = (outer_diameter + 2 * insulation_thickness) * 0.0254
         self.ambient_temperature = ambient_temperature
         self.emissivity = emissivity
         
@@ -123,7 +125,7 @@ class Air:
         # 0.0254 -> conversion from inch to meter
         _Ra = 0.72 * 9.81 * (101.325 / 0.287) ** 2 *\
             np.abs(surface_temperature - ambient_temperature) / (film_temperature ** 3 * self.u(film_temperature) ** 2) *\
-            (self.total_diameter * 0.0254) ** 3
+            (self.total_diameter) ** 3
         
         return _Ra
     
@@ -165,7 +167,7 @@ class Air:
         # 0.0254 -> conversion from inch to meters
         h_conv = 1000 / 0.72 *\
                  (0.6 + 0.387 / 1.20326 * self.Ra(surface_temperature_K, ambient_temperature_K) ** (1/6)) ** 2 *\
-                 self.u(film_temperature_K) * self.cp(film_temperature_K) / (self.total_diameter * 0.0254)
+                 self.u(film_temperature_K) * self.cp(film_temperature_K) / (self.total_diameter)
     
         _h_comb_vec = np.c_[h_rad, h_conv]
     
@@ -257,7 +259,7 @@ class Piping_Segment:
         # fluid properties
         self.inlet_temperature = inlet_temperature
         self.ambient_temperature = ambient_temperature
-        self.mass_flow_rate = mass_flow_rate
+        self.mass_flow_rate = mass_flow_rate / 3.6
         self.specific_heat_capacity = specific_heat_capacity
 
         # add heat rate per segment length, that will be populated during solution for total piping

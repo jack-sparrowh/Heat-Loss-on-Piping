@@ -29,7 +29,7 @@ def user_table_prepare(user_table, units):
     prep_user_table = user_table[user_table.notnull().all(1)].copy()
 
     if units.lower() == 'imperial':
-        prep_user_table.loc[:, 'segment_length'] *= 0.3048 # 1 ft = 0.3048 m
+        prep_user_table.loc[:, 'segment_length'] *= 1 / 0.3048 # 1 ft = 0.3048 m
 
     # diameter and insulation thickness is always in inches, convert them to meters
     prep_user_table.loc[:, 
@@ -58,7 +58,6 @@ def prop_table_prepare(properties_table):
         Prepared properties table. 
     '''
 
-    # to be updated with heat flux etc
     prep_properties_table = properties_table.copy().iloc[:, 0]
     prep_properties_table.name = 'Values'
     prep_properties_table.index = [
@@ -68,6 +67,7 @@ def prop_table_prepare(properties_table):
         'specific_heat_capacity',
         'k_pipe',
         'k_insulation',
+        'heat_flux',
         'emissivity'
     ]
     return prep_properties_table
@@ -92,7 +92,6 @@ def prop_table_units_handler(properties_table, units):
     
     _uh_prop_table = prop_table_prepare(properties_table)
 
-    # to be updated with heat flux etc
     if units.lower() == 'imperial':
         _uh_prop_table['inlet_temperature'] = (_uh_prop_table['inlet_temperature'] - 32) / 1.8
         _uh_prop_table['ambient_temperature'] = (_uh_prop_table['ambient_temperature'] - 32) / 1.8
@@ -100,6 +99,7 @@ def prop_table_units_handler(properties_table, units):
         _uh_prop_table['specific_heat_capacity'] *= 4.1868 # 1 BTU/lb.F = 4.1868 kJ/kg.K
         _uh_prop_table['k_pipe'] *= 1.73073 # 1 BTU/ft.h.F = 1.73073 W/m.K
         _uh_prop_table['k_insulation'] *= 1.73073 # 1 BTU/ft.h.F = 1.73073 W/m.K
+        _uh_prop_table['heat_flux'] *= 3.154105 # 1 BTU/ft2.h = 3.154105 W/m2
     
     return _uh_prop_table
 
@@ -126,7 +126,8 @@ def user_units(units):
             'kg/h',
             'kJ/kg.K',
             'W/m.K',
-            'W/m.K'
+            'W/m.K',
+            'W/m2',
             ''
         ]
     
@@ -137,7 +138,8 @@ def user_units(units):
         'lbm/h',
         'BTU/lbm.F',
         'BTU/ft.h.F',
-        'BTU/ft.h.F'
+        'BTU/ft.h.F',
+        'BTU/ft2.h',
         ''
     ]
     
