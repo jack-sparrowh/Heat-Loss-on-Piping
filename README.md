@@ -26,6 +26,6 @@ You have two simple options to get started:
 
 Detailed examples demonstrating how to use each calculation mode are provided in separate files within this repository:
 
-*   [Link to Standard Calculation Example File](Standard_calculations)
+*   [Standard_calculations](https://github.com/jack-sparrowh/Heat-Loss-on-Piping/blob/main/Examples/Standard.ipynb)
 *   [Link to External Flux Example File](External_Heat_Flux)
 *   [Link to Heat Tracing Example File](Heat_Tracing)
