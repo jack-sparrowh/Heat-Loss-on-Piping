@@ -1,11 +1,31 @@
-# Heat Loss on Piping
+# Heat Loss on Piping with Heat Flux
 
-This README is a simple yapping introduction. I will update it to look professional, once I'm done with excel implementation and all derivations text.
+A Python-based tool implemented in Excel for easily calculating heat loss (or gain) of fluid flowing through insulated piping systems. This tool allows users to model various thermal scenarios, including convection, radiation, and external/internal heat flux applications.
 
-Code calculating heat loss (or gain) of liquid flowing at constant mass flow rate through insulated (or not) piping. Additionally, user can specify external incident heat flux or heat tracing at piping-insulaiton interface.
+## How It Works (Brief Overview)
 
-The code was prepared to run inside excels implementation of python IDE, that is meant to be utilized inside company I'm working for (who knows if it will).
+The tool calculates heat transfer by integrating the effects of convection, radiation, and applied fluxes across the piping insulation system. Users can select the appropriate mode to match their physical scenario: Standard for passive loss/gain, External Flux for environmental loading, or Heat Tracing for active heating requirements.
 
-Most importantly this is a project that allowed me to understand steady-state heat transfer.
+## Features
 
-I'm adding also draft of my introduction text that will be attached in excel file. Additionally, there will be a whole blog post written with all derivations and I will drop it here once it is done. I'm writting all of it in my own free time, so it takes me a lot of time.
+*   **Versatile Calculation Modes:**
+    *   **(1) Standard:** Calculates total heat loss considering **convection** and **radiation**.
+    *   **(2) External Heat Flux:** Applies an external heat flux (e.g., solar radiation) directly onto the insulation surface.
+    *   **(3) Heat Tracing:** Applies a specific heat flux at the piping-insulation interface to model active heating/tracing.
+*   **Emissivity Control:** Easily select and input the emissivity ($\epsilon$) of the insulation surface for accurate radiation calculations.
+*   **Dual Implementation:** Available as a user-friendly **Excel IDE** or runnable Python scripts.
+
+## Installation
+
+You have two simple options to get started:
+
+1.  **Excel IDE (Recommended):** Download and open the provided Excel file directly.
+2.  **Python Files:** Clone the repository and run the necessary Python scripts.
+
+## Usage Examples
+
+Detailed examples demonstrating how to use each calculation mode are provided in separate files within this repository:
+
+*   [Link to Standard Calculation Example File](Standard_calculations)
+*   [Link to External Flux Example File](External_Heat_Flux)
+*   [Link to Heat Tracing Example File](Heat_Tracing)
