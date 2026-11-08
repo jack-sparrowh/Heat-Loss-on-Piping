@@ -8,6 +8,10 @@ The primary goal of this project is to provide accurate results with minimal use
 
 The tool calculates heat transfer by integrating the effects of convection, radiation, and applied fluxes across the piping insulation system. Users can select the appropriate mode to match their physical scenario: Standard for passive loss/gain, External Flux for environmental loading, or Heat Tracing for active heating requirements.
 
+## Modyfications
+
+Excel cells are locked by default, but they are not protected by password, just unlock them in the review tab. Fell free to modify my code or Excel spreadsheet to your liking.
+
 ## Features
 
 *   **Versatile Calculation Modes:**
@@ -31,3 +35,7 @@ Detailed examples demonstrating how to use each calculation mode are provided in
 *   [Standard calculations](https://github.com/jack-sparrowh/Heat-Loss-on-Piping/blob/main/Examples/Standard.ipynb)
 *   [External Heat Flux](https://github.com/jack-sparrowh/Heat-Loss-on-Piping/blob/main/Examples/External%20Heat%20Flux.ipynb)
 *   [Heat Tracing](https://github.com/jack-sparrowh/Heat-Loss-on-Piping/blob/main/Examples/Heat%20Tracing.ipynb)
+
+## Errors
+
+If you find any errors or inconsistencies, please file an issue, and I will happily look into it.
