@@ -2,7 +2,7 @@
 
 A Python-based tool implemented in Excel for easily calculating heat loss (or gain) of fluid flowing through insulated piping systems. This tool allows users to model various thermal scenarios, including convection, radiation, and external/internal heat flux applications.
 
-The primary goal of this project is to provide accurate results with minimal user input required. There is no need to connect to an external database or perform complex secondary calculations. Users have the option to provide density ($\rho$) and viscosity ($\mu$) to correct values such as volumetric flow rate and Reynolds number. If these values are omitted, default values for water (density at $20^{\circ}\text{C}$ and viscosity calculated at the mean temperature between inlet and outlet) will be used for each segment. For more detailed information, please refer to the User Guide.
+The primary goal of this project is to provide accurate results with minimal user input required. There is no need to connect to an external database or perform secondary calculations. Users have the option to provide density ($\rho$) and viscosity ($\mu$) to correct values such as volumetric flow rate and Reynolds number. If these values are omitted, default values for water (density at $20^{\circ}\text{C}$ and viscosity calculated at the mean temperature between inlet and outlet) will be used for each segment. For more detailed information, please refer to the User Guide.
 
 ## How It Works (Brief Overview)
 
